@@ -18,11 +18,14 @@ import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Lazy;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.io.File;
 import java.util.List;
+import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import java.util.function.Consumer;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -46,9 +49,12 @@ public class DishServiceImpl extends ServiceImpl<DishMapper, Dish> implements Di
     @Value("${reggie.path}")
     private String path;
 
+    @Autowired
+    private RedisTemplate redisTemplate;
+
 
     /**
-     * 菜品和口味数据分别插入两张表
+     * 菜品和口味数据分别插入两张表 -- 改造加入redis缓存
      * @param dishDto
      */
     @Transactional
@@ -66,6 +72,14 @@ public class DishServiceImpl extends ServiceImpl<DishMapper, Dish> implements Di
                     dishFlavor.setDishId(dishId);
                     return dishFlavor;
                 }).collect(Collectors.toList());
+
+        //全部删除redis中的菜品信息
+        //Set keys = redisTemplate.keys("Dish_*");
+        //redisTemplate.delete(keys);
+
+        //精准删除redis中的数据
+        String key = "Dish_" +dishDto.getCategoryId() + "_1";
+        redisTemplate.delete(key);
 
         //批量保存菜品口味数据到菜品口味表dish_flavor
         dishFlavorService.saveBatch(flavors);
@@ -145,7 +159,7 @@ public class DishServiceImpl extends ServiceImpl<DishMapper, Dish> implements Di
     }
 
     /**
-     * 更改菜品信息
+     * 更改菜品信息 -- 改造加入redis缓存
      * @param dishDto
      */
     @Transactional
@@ -164,6 +178,10 @@ public class DishServiceImpl extends ServiceImpl<DishMapper, Dish> implements Di
             dishFlavor.setDishId(dishDto.getId());
             return dishFlavor;
         }).collect(Collectors.toList());
+
+        //精准删除redis中的数据
+        String key = "Dish_" +dishDto.getCategoryId() + "_1";
+        redisTemplate.delete(key);
 
         //批量保存设置好的口味信息
         dishFlavorService.saveBatch(flavors);
@@ -230,7 +248,7 @@ public class DishServiceImpl extends ServiceImpl<DishMapper, Dish> implements Di
     }
 
     /**
-     * 根据分类Id查询菜品 - 改进
+     * 根据分类Id查询菜品 - 改进 - 再改进加入Redis缓存
      * @param dish
      */
     /*@Override
@@ -248,6 +266,18 @@ public class DishServiceImpl extends ServiceImpl<DishMapper, Dish> implements Di
     }*/
     @Override
     public List<DishDto> getByCategoryId(Dish dish) {
+
+        List<DishDto> dishDtosWithFlavor = null;
+
+        //尝试先从redis中查询数据
+        //动态构造一个key值
+        String key = "Dish_" + dish.getCategoryId() + "_" + dish.getStatus();
+        dishDtosWithFlavor = (List<DishDto>) redisTemplate.opsForValue().get(key);
+        if (dishDtosWithFlavor != null) {
+            //如果存在，直接返回，无需查询数据库
+            return dishDtosWithFlavor;
+        }
+
         LambdaQueryWrapper<Dish> dishLambdaQueryWrapper = new LambdaQueryWrapper<>();
         dishLambdaQueryWrapper.eq(dish.getCategoryId() != null, Dish::getCategoryId, dish.getCategoryId());
         dishLambdaQueryWrapper.eq(dish.getStatus() != null, Dish::getStatus, 1);
@@ -262,7 +292,7 @@ public class DishServiceImpl extends ServiceImpl<DishMapper, Dish> implements Di
             }
         }).collect(Collectors.toList());
 
-        List<DishDto> dishDtosWithFlavor = dishDtoList.stream().map(new Function<DishDto, DishDto>() {
+        dishDtosWithFlavor = dishDtoList.stream().map(new Function<DishDto, DishDto>() {
             @Override
             public DishDto apply(DishDto dishDto) {
                 LambdaQueryWrapper<DishFlavor> flavorLambdaQueryWrapper = new LambdaQueryWrapper<>();
@@ -272,6 +302,10 @@ public class DishServiceImpl extends ServiceImpl<DishMapper, Dish> implements Di
                 return dishDto;
             }
         }).collect(Collectors.toList());
+
+        //如果不存在，需要查询数据库，将查询到的菜品数据缓存到Redis
+        redisTemplate.opsForValue().set(key, dishDtosWithFlavor, 60, TimeUnit.MINUTES);
+
         return dishDtosWithFlavor;
     }
 }
