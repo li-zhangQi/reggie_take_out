@@ -16,6 +16,8 @@ import org.apache.commons.lang.StringUtils;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.cache.annotation.CacheEvict;
+import org.springframework.cache.annotation.Cacheable;
 import org.springframework.context.annotation.Lazy;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -49,6 +51,7 @@ public class SetmealServiceImpl extends ServiceImpl<SetmealMapper, Setmeal> impl
      * 添加套餐
      * @param setmealDto
      */
+    @CacheEvict(value = "setmealCache", allEntries = true)
     @Transactional
     @Override
     public void saveSetmealWithDish(SetmealDto setmealDto) {
@@ -145,6 +148,7 @@ public class SetmealServiceImpl extends ServiceImpl<SetmealMapper, Setmeal> impl
      * 删除套餐
      * @param ids
      */
+    @CacheEvict(value = "setmealCache", allEntries = true) //allEntries匹配value下的全部缓存
     @Transactional
     @Override
     public void deleteByIds(List<Long> ids) {
@@ -203,10 +207,11 @@ public class SetmealServiceImpl extends ServiceImpl<SetmealMapper, Setmeal> impl
     }
 
     /**
-     * 跟新套餐信息和关联的菜品关系
+     * 更新套餐信息和关联的菜品关系
      * 两表更新信息
      * @param setmealDto
      */
+    @CacheEvict(value = "setmealCache", allEntries = true)
     @Transactional
     @Override
     public void updateWithDish(SetmealDto setmealDto) {
@@ -237,11 +242,12 @@ public class SetmealServiceImpl extends ServiceImpl<SetmealMapper, Setmeal> impl
     }
 
     /**
-     * 展示可售套餐信息
+     * 展示可售套餐信息 -- 改造加入SpringCache封装的redis缓存
      * @param categoryId
      * @param status
      * @return
      */
+    @Cacheable(value = "setmealCache", key = "#categoryId + '_' + #status")
     @Override
     public List<Setmeal> list(Long categoryId, Integer status) {
         LambdaQueryWrapper<Setmeal> setmealLambdaQueryWrapper = new LambdaQueryWrapper<>();
