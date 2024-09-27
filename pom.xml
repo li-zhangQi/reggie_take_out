@@ -99,6 +99,13 @@
             <artifactId>spring-boot-starter-cache</artifactId>
         </dependency>
 
+        <!--Sharding-JDBC读写分离坐标-->
+        <dependency>
+            <groupId>org.apache.shardingsphere</groupId>
+            <artifactId>sharding-jdbc-spring-boot-starter</artifactId>
+            <version>4.0.0-RC1</version>
+        </dependency>
+
     </dependencies>
 
     <build>
