@@ -3,6 +3,8 @@ package com.itheima.reggie.controller;
 import com.itheima.reggie.common.R;
 import com.itheima.reggie.entity.User;
 import com.itheima.reggie.service.UserService;
+import io.swagger.annotations.Api;
+import io.swagger.annotations.ApiOperation;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.PostMapping;
@@ -19,6 +21,7 @@ import java.util.Map;
  * @Description: 用户管理类
  * @Notice:
  */
+@Api(tags = "后台用户管理接口")
 @Slf4j
 @RestController
 @RequestMapping("/user")
@@ -33,6 +36,7 @@ public class UserController {
      * @param user
      * @return
      */
+    @ApiOperation(value = "发送手机验证码接口")
     @PostMapping("/sendMsg")
     public R<String> sendMsg(@RequestBody User user, HttpSession httpSession) {
 
@@ -47,6 +51,7 @@ public class UserController {
      * @param httpSession
      * @return
      */
+    @ApiOperation(value = "移动端用户登录接口")
     @PostMapping("/login")
     public R<User> login(@RequestBody Map map, HttpSession httpSession) {
         User user = userService.loginUser(map, httpSession);
